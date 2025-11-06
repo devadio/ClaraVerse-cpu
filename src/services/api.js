@@ -15,17 +15,21 @@ class PythonApi {
     // Initialize the API client
     this.init();
     
-    // Listen for backend status updates from Electron
-    if (window.electron) {
-      window.electron.receive('backend-status', (status) => {
-        console.log('Backend status update:', status);
-        if (status.status === 'running' && status.port) {
-          this.updateBackendInfo(status.port);
-        } else if (['crashed', 'failed', 'stopped', 'unresponsive'].includes(status.status)) {
-          this.initialized = false;
-          this.scheduleReconnect();
-        }
-      });
+    // Listen for backend status updates from Electron (only in Electron environment)
+    if (window.electron && typeof window.electron.receive === 'function') {
+      try {
+        window.electron.receive('backend-status', (status) => {
+          console.log('Backend status update:', status);
+          if (status && status.status === 'running' && status.port) {
+            this.updateBackendInfo(status.port);
+          } else if (status && ['crashed', 'failed', 'stopped', 'unresponsive'].includes(status.status)) {
+            this.initialized = false;
+            this.scheduleReconnect();
+          }
+        });
+      } catch (error) {
+        console.warn('Failed to set up backend status listener:', error);
+      }
     }
     
     // Set up periodic backend status checks
@@ -33,12 +37,18 @@ class PythonApi {
   }
   
   setupPeriodicChecks() {
+    // Only set up checks in Electron environment
+    if (!window.electron || typeof window.electron.checkPythonBackend !== 'function') {
+      console.log('Backend checks disabled in web mode');
+      return;
+    }
+
     // Check backend status every 10 seconds
     setInterval(async () => {
       if (window.electron && !this.initialized) {
         try {
           const status = await window.electron.checkPythonBackend();
-          if (status.status === 'running' && status.available && status.port) {
+          if (status && status.status === 'running' && status.available && status.port) {
             this.updateBackendInfo(status.port);
           }
         } catch (error) {
@@ -68,7 +78,7 @@ class PythonApi {
     this.initPromise = new Promise(async (resolve) => {
       try {
         // Try to get port from Electron first
-        if (window.electron) {
+        if (window.electron && typeof window.electron.getPythonPort === 'function') {
           try {
             this.port = await window.electron.getPythonPort();
             if (this.port) {
@@ -83,7 +93,15 @@ class PythonApi {
             console.warn('Failed to get Python port from Electron:', error);
           }
         }
-        
+
+        // In web mode, skip port detection - backend not available
+        if (!window.electron || typeof window.electron.getPythonPort !== 'function') {
+          console.log('API initialization skipped in web mode - no backend available');
+          this.initialized = false;
+          resolve({ error: 'Backend not available in web mode' });
+          return;
+        }
+
         // If still not initialized, try to detect port by probing
         await this.detectPortByProbing();
         resolve({ port: this.port });

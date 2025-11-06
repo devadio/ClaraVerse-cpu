@@ -6,7 +6,29 @@
  * about desktop-only features.
  */
 
-const createDesktopPromptEvent = (feature: string, method: string) => {
+// Silent methods that don't trigger prompts (just return empty/false)
+const SILENT_METHODS = new Set([
+  'getCustomModelPaths',
+  'getModels',
+  'getLocalModels',
+  'getContainers',
+  'getStatus',
+  'comfyuiStatus',
+  'checkDockerServices',
+  'getServicesStatus',
+  'getServicePorts',
+  'getServers',
+  'getTemplates',
+  'checkPythonBackend',
+  'getPythonPort'
+]);
+
+const createDesktopPromptEvent = (feature: string, method: string, forceShow: boolean = false) => {
+  // Don't show prompts for "getter" methods that are just checking status
+  if (!forceShow && SILENT_METHODS.has(method)) {
+    return;
+  }
+
   window.dispatchEvent(new CustomEvent('show-desktop-prompt', {
     detail: {
       feature,
@@ -71,13 +93,36 @@ export const mockElectronAPI = {
     }
     createDesktopPromptEvent('clipboard', 'readFromClipboard');
     return '';
-  }
+  },
+  // Event listener methods (no-ops for web)
+  receive: (channel: string, callback: (...args: any[]) => void) => {
+    // No-op: Electron events don't fire in web mode
+  },
+  removeListener: (channel: string, callback?: (...args: any[]) => void) => {
+    // No-op: Nothing to remove in web mode
+  },
+  send: (channel: string, ...args: any[]) => {
+    // No-op: Can't send to main process in web mode
+  },
+  sendReactReady: () => {
+    // No-op: No main process to notify in web mode
+  },
+  getPythonPort: async () => {
+    return null;
+  },
+  checkPythonBackend: async () => {
+    return {
+      status: 'unavailable',
+      available: false,
+      port: null
+    };
+  },
+  isDev: false
 };
 
 // Mock window.electronAPI (Docker/Container management)
 export const mockElectronAPIService = {
   getContainers: async () => {
-    createDesktopPromptEvent('docker', 'getContainers');
     return [];
   },
   containerAction: async () => {
@@ -89,8 +134,12 @@ export const mockElectronAPIService = {
     return { success: false, message: 'Docker management requires desktop app' };
   },
   checkDockerServices: async () => {
-    createDesktopPromptEvent('docker', 'checkDockerServices');
-    return { available: false, message: 'Desktop app required' };
+    return {
+      dockerAvailable: false,
+      n8nAvailable: false,
+      pythonAvailable: false,
+      message: 'Desktop app required'
+    };
   },
   getServicesStatus: async () => {
     return {
@@ -100,7 +149,7 @@ export const mockElectronAPIService = {
     };
   },
   getServicePorts: async () => {
-    return { n8n: null, comfyui: null, python: null };
+    return { n8nPort: null };
   },
   comfyuiStart: async () => {
     createDesktopPromptEvent('comfyui', 'start');
@@ -113,8 +162,18 @@ export const mockElectronAPIService = {
   comfyuiStatus: async () => {
     return { running: false, available: false };
   },
-  onBackendStatus: () => {},
-  onPythonStatus: () => {}
+  // Event listeners (no-ops)
+  onBackendStatus: (callback: (...args: any[]) => void) => {
+    // No-op: Backend events don't fire in web mode
+  },
+  onPythonStatus: (callback: (...args: any[]) => void) => {
+    // No-op: Python events don't fire in web mode
+  },
+  // Additional methods that might be called
+  invoke: async (channel: string, ...args: any[]) => {
+    console.log(`Mock electronAPI.invoke called: ${channel}`);
+    return null;
+  }
 };
 
 // Mock window.llamaSwap API
@@ -131,6 +190,10 @@ export const mockLlamaSwapAPI = {
     createDesktopPromptEvent('llamaSwap', 'restartService');
     return { success: false };
   },
+  restart: async () => {
+    createDesktopPromptEvent('llamaSwap', 'restart');
+    return { success: false };
+  },
   getStatus: async () => {
     return {
       running: false,
@@ -140,11 +203,25 @@ export const mockLlamaSwapAPI = {
     };
   },
   getModels: async () => {
-    createDesktopPromptEvent('llamaSwap', 'getModels');
     return [];
   },
   getApiUrl: async () => {
     return null;
+  },
+  getCustomModelPaths: async () => {
+    return [];
+  },
+  setCustomModelPath: async (path: string | null) => {
+    // Silent fail - store in localStorage as fallback
+    if (path) {
+      localStorage.setItem('custom-model-path', path);
+    } else {
+      localStorage.removeItem('custom-model-path');
+    }
+    return { success: true };
+  },
+  regenerateConfig: async () => {
+    return { success: true };
   },
   onProgressUpdate: () => {}
 };
@@ -300,36 +377,41 @@ export const mockElectronScreenShareAPI = {
 export const initializeMockAPIs = () => {
   if (typeof window === 'undefined') return;
 
-  // Only add mocks if the real APIs don't exist
-  if (!window.electron) {
-    (window as any).electron = mockElectronAPI;
-  }
-  if (!window.electronAPI) {
-    (window as any).electronAPI = mockElectronAPIService;
-  }
-  if (!window.llamaSwap) {
-    (window as any).llamaSwap = mockLlamaSwapAPI;
-  }
-  if (!window.modelManager) {
-    (window as any).modelManager = mockModelManagerAPI;
-  }
-  if (!window.mcpService) {
-    (window as any).mcpService = mockMCPServiceAPI;
-  }
-  if (!window.windowManager) {
-    (window as any).windowManager = mockWindowManagerAPI;
-  }
-  if (!window.featureConfig) {
-    (window as any).featureConfig = mockFeatureConfigAPI;
-  }
-  if (!window.developerLogs) {
-    (window as any).developerLogs = mockDeveloperLogsAPI;
-  }
-  if (!window.electronScreenShare) {
-    (window as any).electronScreenShare = mockElectronScreenShareAPI;
-  }
+  try {
+    // Only add mocks if the real APIs don't exist
+    if (!window.electron) {
+      (window as any).electron = mockElectronAPI;
+    }
+    if (!window.electronAPI) {
+      (window as any).electronAPI = mockElectronAPIService;
+    }
+    if (!window.llamaSwap) {
+      (window as any).llamaSwap = mockLlamaSwapAPI;
+    }
+    if (!window.modelManager) {
+      (window as any).modelManager = mockModelManagerAPI;
+    }
+    if (!window.mcpService) {
+      (window as any).mcpService = mockMCPServiceAPI;
+    }
+    if (!window.windowManager) {
+      (window as any).windowManager = mockWindowManagerAPI;
+    }
+    if (!window.featureConfig) {
+      (window as any).featureConfig = mockFeatureConfigAPI;
+    }
+    if (!window.developerLogs) {
+      (window as any).developerLogs = mockDeveloperLogsAPI;
+    }
+    if (!window.electronScreenShare) {
+      (window as any).electronScreenShare = mockElectronScreenShareAPI;
+    }
 
-  console.log('🌐 Running in web mode - Electron APIs mocked');
+    console.log('🌐 Running in web mode - Electron APIs mocked');
+  } catch (error) {
+    console.error('Error initializing mock APIs:', error);
+    // Even if mocking fails, don't crash - the app will handle missing APIs
+  }
 };
 
 export default {

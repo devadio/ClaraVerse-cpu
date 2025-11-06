@@ -11,8 +11,12 @@ import './styles/animations.css'; // Import animations
 
 // Initialize mock Electron APIs if running in web environment
 if (!isElectron()) {
-  console.log('🌐 Running in web mode - initializing mock APIs');
-  initializeMockAPIs();
+  try {
+    console.log('🌐 Running in web mode - initializing mock APIs');
+    initializeMockAPIs();
+  } catch (error) {
+    console.error('Failed to initialize mock APIs:', error);
+  }
 }
 
 // Set initial theme to light mode by default
