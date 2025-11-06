@@ -4,8 +4,16 @@ import App from './App.tsx';
 import ErrorBoundary from './components/ErrorBoundary.tsx';
 import { setupGlobalErrorHandlers } from './utils/globalErrorHandler.ts';
 import './utils/errorTestHelpers.ts'; // Import to make console helpers available
+import { initializeMockAPIs } from './utils/electronMocks.ts';
+import { isElectron } from './utils/electronEnvironment.ts';
 import './index.css';
 import './styles/animations.css'; // Import animations
+
+// Initialize mock Electron APIs if running in web environment
+if (!isElectron()) {
+  console.log('🌐 Running in web mode - initializing mock APIs');
+  initializeMockAPIs();
+}
 
 // Set initial theme to light mode by default
 document.documentElement.classList.remove('dark');

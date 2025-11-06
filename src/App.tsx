@@ -23,6 +23,8 @@ import { ProvidersProvider } from './contexts/ProvidersContext';
 import ClaraAssistant from './components/ClaraAssistant';
 import { StartupService } from './services/startupService';
 import { initializeUIPreferences, applyUIPreferences } from './utils/uiPreferences';
+import { DesktopAppPromotion, WebModeBanner } from './components/DesktopAppPromotion';
+import { isElectron } from './utils/electronEnvironment';
 
 function App() {
   const [activePage, setActivePage] = useState(() => localStorage.getItem('activePage') || 'dashboard');
@@ -64,16 +66,21 @@ function App() {
     StartupService.getInstance().applyStartupSettings();
   }, []);
 
-  // Trigger MCP servers restoration on app startup
+  // Trigger MCP servers restoration on app startup (Electron only)
   useEffect(() => {
     const restoreMCPServers = async () => {
+      // Only attempt in Electron environment
+      if (!isElectron()) {
+        return;
+      }
+
       if (window.mcpService && !showOnboarding) {
         try {
           console.log('App ready - attempting to restore MCP servers...');
           const results = await window.mcpService.startPreviouslyRunning();
           const successCount = results.filter((r: { success: boolean }) => r.success).length;
           const totalCount = results.length;
-          
+
           if (totalCount > 0) {
             console.log(`MCP restoration: ${successCount}/${totalCount} servers restored`);
           } else {
@@ -257,6 +264,12 @@ function App() {
   return (
     <ProvidersProvider>
       <div className="min-h-screen bg-gradient-to-br from-white to-sakura-100 dark:from-gray-900 dark:to-sakura-100">
+        {/* Web mode banner for non-Electron environments */}
+        <WebModeBanner />
+
+        {/* Desktop app promotion notifications */}
+        <DesktopAppPromotion />
+
         {showOnboarding ? (
           <Onboarding onComplete={handleOnboardingComplete} />
         ) : (
@@ -265,7 +278,7 @@ function App() {
             <div className={activePage === 'clara' ? 'block' : 'hidden'} data-clara-container>
               <ClaraAssistant onPageChange={setActivePage} />
             </div>
-            
+
             {/* Render other content when not on Clara page */}
             {activePage !== 'clara' && renderContent()}
           </>

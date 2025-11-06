@@ -1,0 +1,59 @@
+# Vercel ignore file - don't upload unnecessary files
+
+# Electron specific
+electron/
+build/
+*.AppImage
+*.dmg
+*.exe
+*.deb
+*.snap
+
+# Development
+node_modules/
+.git/
+.vscode/
+
+# Build artifacts
+dist-electron/
+release/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment
+.env.local
+.env.*.local
+
+# Testing
+coverage/
+.nyc_output/
+
+# Documentation (can be selectively included)
+docs/
+
+# Python backend
+backend/
+*.pyc
+__pycache__/
+
+# Go binaries
+widgets_service_app/
+clara-core-optimiser/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Docker
+docker/
+Dockerfile*
+docker-compose*.yml
+
+# Scripts (mostly for electron builds)
+scripts/
