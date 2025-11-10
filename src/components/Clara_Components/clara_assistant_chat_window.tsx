@@ -964,7 +964,8 @@ const ClaraChatWindow: React.FC<ClaraChatWindowProps> = ({
     }
   }, [scrollTrigger]);
 
-  // Industry-standard auto-scroll: scroll on EVERY content update (ChatGPT/Claude style)
+  // PERFORMANCE OPTIMIZED: Auto-scroll with batching for smooth streaming
+  // Note: With batched state updates in ClaraAssistant, this now triggers at ~60fps instead of 100+fps
   useEffect(() => {
     const lastMessage = messages[messages.length - 1];
     if (!lastMessage) return;
@@ -972,15 +973,15 @@ const ClaraChatWindow: React.FC<ClaraChatWindowProps> = ({
     const isStreaming = lastMessage?.metadata?.isStreaming;
 
     if (isStreaming) {
-      // Instant bottom-pin on every streaming update (no intervals!)
-      // This is called on EVERY token/chunk, creating seamless scrolling
+      // Scrolling is naturally throttled by requestAnimationFrame batching in parent
+      // This creates seamless scrolling without excessive calls
       autoScrollerRef.current?.startStreamingScroll();
     } else {
       // Stop streaming and do final scroll to new message
       autoScrollerRef.current?.stopStreamingScroll();
       autoScrollerRef.current?.scrollToNewMessage();
     }
-  }, [messages.length, messages[messages.length - 1]?.content]); // Triggers on EVERY content change
+  }, [messages.length, messages[messages.length - 1]?.content]); // Batched updates from parent
 
   // Update processing state based on loading and messages
   useEffect(() => {

@@ -343,19 +343,49 @@ export function useAssistantChat({
       } else {
         let responseContent = '';
         let responseTokens = 0;
-        
+
         if (isStreaming) {
+          // PERFORMANCE OPTIMIZATION: Batch streaming chunks to reduce re-renders
+          let pendingChunks: string[] = [];
+          let rafScheduled = false;
+
+          const processPendingChunks = () => {
+            if (pendingChunks.length === 0) {
+              rafScheduled = false;
+              return;
+            }
+
+            const batchedContent = pendingChunks.join('');
+            pendingChunks = [];
+            rafScheduled = false;
+
+            responseContent += batchedContent;
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessage.id ? { ...msg, content: responseContent } : msg
+              )
+            );
+            scrollToBottom();
+          };
+
           for await (const chunk of client.streamChat(actualModelToUse, formattedMessages, chatOptions)) {
             if (chunk.message?.content) {
-              responseContent += chunk.message.content;
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMessage.id ? { ...msg, content: responseContent } : msg
-                )
-              );
-              scrollToBottom();
+              // Add to batch buffer
+              pendingChunks.push(chunk.message.content);
+
+              // Schedule processing if not already scheduled
+              if (!rafScheduled) {
+                rafScheduled = true;
+                requestAnimationFrame(processPendingChunks);
+              }
             }
           }
+
+          // Process any remaining chunks
+          if (pendingChunks.length > 0) {
+            processPendingChunks();
+          }
+
           responseTokens = 0;
         } else {
           const response = await client.sendChat(actualModelToUse, formattedMessages, chatOptions);

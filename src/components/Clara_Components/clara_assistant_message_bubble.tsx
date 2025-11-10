@@ -1763,4 +1763,23 @@ const AttachmentDetailModal: React.FC<{
   );
 };
 
-export default ClaraMessageBubble; 
+// PERFORMANCE OPTIMIZATION: Memoize component to prevent unnecessary re-renders during streaming
+// Only re-render if message content, streaming status, or key props actually change
+export default React.memo(
+  ClaraMessageBubble,
+  (prevProps, nextProps) => {
+    // Return true if props are equal (skip re-render), false if different (re-render)
+    const messageEqual =
+      prevProps.message.id === nextProps.message.id &&
+      prevProps.message.content === nextProps.message.content &&
+      prevProps.message.role === nextProps.message.role &&
+      prevProps.message.metadata?.isStreaming === nextProps.message.metadata?.isStreaming &&
+      prevProps.message.metadata?.toolExecutionBlock === nextProps.message.metadata?.toolExecutionBlock;
+
+    const propsEqual =
+      prevProps.userName === nextProps.userName &&
+      prevProps.isEditable === nextProps.isEditable;
+
+    return messageEqual && propsEqual;
+  }
+); 

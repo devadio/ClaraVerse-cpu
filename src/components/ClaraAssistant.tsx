@@ -1871,12 +1871,33 @@ Now tell me what is the result "`;
       // Track thinking tag state for filtering during streaming
       let isInsideThinkingTag = false;
       let rawStreamContent = ''; // Store raw content including thinking tags
-      
-      // Create enhanced streaming callback that updates both message content and status panel
-      const enhancedStreamingCallback = (chunk: string) => {
+
+      // PERFORMANCE OPTIMIZATION: Batch streaming chunks to reduce re-renders
+      let pendingChunks: string[] = [];
+      let rafScheduled = false;
+      let lastToolExecutionData: any = null;
+
+      // Process accumulated chunks and trigger a single state update
+      const processPendingChunks = () => {
+        if (pendingChunks.length === 0) {
+          rafScheduled = false;
+          return;
+        }
+
+        // Combine all pending chunks
+        const batchedChunk = pendingChunks.join('');
+        pendingChunks = [];
+        rafScheduled = false;
+
+        // Process the batched chunk with the original logic
+        processChunk(batchedChunk);
+      };
+
+      // Original chunk processing logic (extracted for batching)
+      const processChunk = (chunk: string) => {
         // Always accumulate raw content (including thinking tags)
         rawStreamContent += chunk;
-        
+
         // Parse status updates from chunk for autonomous agent first
         if (enforcedConfig.autonomousAgent?.enabled && chunk.includes('**')) {
           parseAndUpdateAgentStatus(chunk);
@@ -1889,22 +1910,12 @@ Now tell me what is the result "`;
             try {
               const toolExecutionData = JSON.parse(blockMatch[1]);
               console.log(`📦 Processing tool execution block with ${toolExecutionData.tools?.length || 0} tools`);
-              
-              // Store tool execution data in the message metadata
-              setMessages(prev => prev.map(msg => 
-                msg.id === streamingMessageId 
-                  ? { 
-                      ...msg, 
-                      metadata: {
-                        ...msg.metadata,
-                        toolExecutionBlock: toolExecutionData
-                      }
-                    }
-                  : msg
-              ));
-              
-              console.log(`✅ Tool execution block stored in message ${streamingMessageId} metadata`);
-              
+
+              // Store for batch update
+              lastToolExecutionData = toolExecutionData;
+
+              console.log(`✅ Tool execution block will be stored in next batch update`);
+
               // Don't add the raw tool execution block to the content
               return;
             } catch (error) {
@@ -1917,41 +1928,21 @@ Now tell me what is the result "`;
         // Check if this chunk contains thinking tag markers
         const openThinkMatch = chunk.match(/<think>|<seed:think>/i);
         const closeThinkMatch = chunk.match(/<\/think>|<\/seed:think>/i);
-        
+
         if (openThinkMatch) {
           isInsideThinkingTag = true;
           console.log('🧠 Entered thinking mode - hiding content during stream');
         }
-        
+
         if (closeThinkMatch) {
           isInsideThinkingTag = false;
           console.log('💭 Exited thinking mode - resuming content display');
         }
-        
-        // If we're inside thinking tags, don't display the chunk
-        // but still update the raw content for final processing
-        if (isInsideThinkingTag || openThinkMatch || closeThinkMatch) {
-          // Update message with raw content but don't display it
-          setMessages(prev => prev.map(msg => 
-            msg.id === streamingMessageId 
-              ? { 
-                  ...msg, 
-                  content: rawStreamContent, // Store complete raw content
-                  metadata: {
-                    ...msg.metadata,
-                    isStreaming: true,
-                    hasThinkingContent: true,
-                    hideStreamingContent: true // Flag to hide during streaming
-                  }
-                }
-              : msg
-          ));
-          return; // Don't show thinking content during streaming
-        }
 
-        // Filter out ALL status messages from chat display when autonomous agent is active
+        // Build metadata for update
+        const shouldHideContent = isInsideThinkingTag || openThinkMatch || closeThinkMatch;
         const isStatusMessage = enforcedConfig.autonomousAgent?.enabled && (
-          chunk.includes('**AGENT_STATUS:') || 
+          chunk.includes('**AGENT_STATUS:') ||
           chunk.includes('**EXECUTION_PLAN:**') ||
           chunk.includes('**TOOL_EXECUTION:') ||
           chunk.includes('**Loaded') ||
@@ -1967,21 +1958,47 @@ Now tell me what is the result "`;
           chunk.includes('**Reflecting') ||
           chunk.includes('__TOOL_EXECUTION_BLOCK__') // Also filter out the raw block markers
         );
-        
-        // Only update message content if it's not a status message
-        if (!isStatusMessage) {
-          setMessages(prev => prev.map(msg => 
-            msg.id === streamingMessageId 
-              ? { 
-                  ...msg, 
-                  content: rawStreamContent, // Use raw content
-                  metadata: {
-                    ...msg.metadata,
-                    isStreaming: true
-                  }
-                }
-              : msg
-          ));
+
+        // BATCHED UPDATE: Single state update for all changes
+        if (!isStatusMessage || shouldHideContent || lastToolExecutionData) {
+          setMessages(prev => prev.map(msg => {
+            if (msg.id !== streamingMessageId) return msg;
+
+            const updatedMetadata = {
+              ...msg.metadata,
+              isStreaming: true,
+              ...(shouldHideContent && {
+                hasThinkingContent: true,
+                hideStreamingContent: true
+              }),
+              ...(lastToolExecutionData && {
+                toolExecutionBlock: lastToolExecutionData
+              })
+            };
+
+            // Clear the tool execution data after using it
+            if (lastToolExecutionData) {
+              lastToolExecutionData = null;
+            }
+
+            return {
+              ...msg,
+              content: rawStreamContent,
+              metadata: updatedMetadata
+            };
+          }));
+        }
+      };
+
+      // New batched streaming callback
+      const enhancedStreamingCallback = (chunk: string) => {
+        // Add chunk to pending buffer
+        pendingChunks.push(chunk);
+
+        // Schedule processing if not already scheduled
+        if (!rafScheduled) {
+          rafScheduled = true;
+          requestAnimationFrame(processPendingChunks);
         }
       };
 
