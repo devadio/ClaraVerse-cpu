@@ -107,48 +107,89 @@ export default defineConfig({
     emptyOutDir: true,
     rollupOptions: {
       output: {
-        manualChunks: {
+        manualChunks: (id) => {
           // Core dependencies
-          vendor: ['react', 'react-dom'],
+          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
+            return 'vendor';
+          }
 
           // Heavy editor - only load when needed
-          monaco: ['@monaco-editor/react', 'monaco-editor'],
+          if (id.includes('node_modules/@monaco-editor') || id.includes('node_modules/monaco-editor')) {
+            return 'monaco';
+          }
 
           // PDF processing - lazy load
-          pdfjs: ['pdfjs-dist'],
+          if (id.includes('node_modules/pdfjs-dist')) {
+            return 'pdfjs';
+          }
 
           // 3D graphics - lazy load
-          three: ['three'],
+          if (id.includes('node_modules/three')) {
+            return 'three';
+          }
 
           // Diagram rendering - lazy load
-          mermaid: ['mermaid'],
+          if (id.includes('node_modules/mermaid')) {
+            return 'mermaid';
+          }
 
           // Chart libraries - lazy load
-          charts: ['chart.js', 'react-chartjs-2'],
+          if (id.includes('node_modules/chart.js') || id.includes('node_modules/react-chartjs-2')) {
+            return 'charts';
+          }
 
           // LangChain and AI - only load when needed
-          langchain: ['langchain', '@langchain/core'],
+          if (id.includes('node_modules/langchain') || id.includes('node_modules/@langchain')) {
+            return 'langchain';
+          }
 
           // ReactFlow for agent builder
-          reactflow: ['reactflow'],
+          if (id.includes('node_modules/reactflow')) {
+            return 'reactflow';
+          }
 
           // Animation libraries
-          animations: ['gsap', 'framer-motion'],
+          if (id.includes('node_modules/gsap') || id.includes('node_modules/framer-motion')) {
+            return 'animations';
+          }
 
           // Markdown and rich text
-          markdown: ['react-markdown', 'remark-gfm', 'rehype-raw', 'rehype-sanitize'],
+          if (id.includes('node_modules/react-markdown') || 
+              id.includes('node_modules/remark-gfm') || 
+              id.includes('node_modules/rehype-raw') || 
+              id.includes('node_modules/rehype-sanitize')) {
+            return 'markdown';
+          }
 
           // UI component libraries
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select', '@radix-ui/react-tabs'],
+          if (id.includes('node_modules/@radix-ui')) {
+            return 'ui';
+          }
 
           // Icons
-          icons: ['lucide-react'],
+          if (id.includes('node_modules/lucide-react')) {
+            return 'icons';
+          }
 
           // Code splitting by route/page
-          'route-agents': [/AgentBuilder/, /AgentStudio/, /AgentManager/, /AgentRunner/],
-          'route-notebooks': [/Notebooks/, /NotebookCanvas/],
-          'route-imagegen': [/ImageGen/, /Gallery/],
-          'route-clara': [/ClaraAssistant/, /clara_assistant/],
+          if (id.includes('AgentBuilder') || 
+              id.includes('AgentStudio') || 
+              id.includes('AgentManager') || 
+              id.includes('AgentRunner')) {
+            return 'route-agents';
+          }
+
+          if (id.includes('Notebooks') || id.includes('NotebookCanvas')) {
+            return 'route-notebooks';
+          }
+
+          if (id.includes('ImageGen') || id.includes('Gallery')) {
+            return 'route-imagegen';
+          }
+
+          if (id.includes('ClaraAssistant') || id.includes('clara_assistant')) {
+            return 'route-clara';
+          }
         },
       },
     },
