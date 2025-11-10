@@ -1,29 +1,41 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import Sidebar from './components/Sidebar';
 import Topbar from './components/Topbar';
-import Dashboard from './components/Dashboard';
-import Settings from './components/Settings';
-import Debug from './components/Debug';
-import Onboarding from './components/Onboarding';
-import ImageGen from './components/ImageGen';
-import Gallery from './components/Gallery';
-import Help from './components/Help';
-import N8N from './components/N8N';
-import Servers from './components/Servers';
-import AgentStudio from './components/AgentStudio';
-import AgentManager from './components/AgentManager';
-import AgentRunnerSDK from './components/AgentRunnerSDK';
-import Lumaui from './components/Lumaui';
-import LumaUILite from './components/LumaUILite';
-import Notebooks from './components/Notebooks';
-import Tasks from './components/Tasks';
-import Community from './components/Community';
 import { db } from './db';
 import { ProvidersProvider } from './contexts/ProvidersContext';
 import { ArtifactPaneProvider } from './contexts/ArtifactPaneContext';
-import ClaraAssistant from './components/ClaraAssistant';
 import { StartupService } from './services/startupService';
 import { initializeUIPreferences, applyUIPreferences } from './utils/uiPreferences';
+
+// Lazy load all page components to reduce initial bundle size
+const Dashboard = lazy(() => import('./components/Dashboard'));
+const Settings = lazy(() => import('./components/Settings'));
+const Debug = lazy(() => import('./components/Debug'));
+const Onboarding = lazy(() => import('./components/Onboarding'));
+const ImageGen = lazy(() => import('./components/ImageGen'));
+const Gallery = lazy(() => import('./components/Gallery'));
+const Help = lazy(() => import('./components/Help'));
+const N8N = lazy(() => import('./components/N8N'));
+const Servers = lazy(() => import('./components/Servers'));
+const AgentStudio = lazy(() => import('./components/AgentStudio'));
+const AgentManager = lazy(() => import('./components/AgentManager'));
+const AgentRunnerSDK = lazy(() => import('./components/AgentRunnerSDK'));
+const Lumaui = lazy(() => import('./components/Lumaui'));
+const LumaUILite = lazy(() => import('./components/LumaUILite'));
+const Notebooks = lazy(() => import('./components/Notebooks'));
+const Tasks = lazy(() => import('./components/Tasks'));
+const Community = lazy(() => import('./components/Community'));
+const ClaraAssistant = lazy(() => import('./components/ClaraAssistant'));
+
+// Loading component for Suspense fallback
+const PageLoader = () => (
+  <div className="flex items-center justify-center h-screen bg-gradient-to-br from-white to-sakura-100 dark:from-gray-900 dark:to-sakura-100">
+    <div className="flex flex-col items-center gap-4">
+      <div className="w-12 h-12 border-4 border-sakura-500 border-t-transparent rounded-full animate-spin"></div>
+      <p className="text-sm text-gray-600 dark:text-gray-400">Loading...</p>
+    </div>
+  </div>
+);
 
 function App() {
   const [activePage, setActivePage] = useState(() => localStorage.getItem('activePage') || 'dashboard');
@@ -147,12 +159,16 @@ function App() {
 
   const renderContent = () => {
     if (activePage === 'assistant') {
-      return <ClaraAssistant onPageChange={setActivePage} />;
+      return (
+        <Suspense fallback={<PageLoader />}>
+          <ClaraAssistant onPageChange={setActivePage} />
+        </Suspense>
+      );
     }
-    
+
     // Clara is now always mounted but conditionally visible
     // This allows it to run in the background
-    
+
     if (activePage === 'agents') {
       const handleEditAgent = (agentId: string) => {
         setEditingAgentId(agentId);
@@ -177,81 +193,105 @@ function App() {
 
       if (agentMode === 'manager') {
         return (
-          <AgentManager
-            onPageChange={setActivePage}
-            onEditAgent={handleEditAgent}
-            onOpenAgent={handleOpenAgent}
-            onCreateAgent={handleCreateAgent}
-            userName={userInfo?.name}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <AgentManager
+              onPageChange={setActivePage}
+              onEditAgent={handleEditAgent}
+              onOpenAgent={handleOpenAgent}
+              onCreateAgent={handleCreateAgent}
+              userName={userInfo?.name}
+            />
+          </Suspense>
         );
       } else if (agentMode === 'studio') {
         return (
-          <AgentStudio
-            onPageChange={handleBackToManager}
-            userName={userInfo?.name}
-            editingAgentId={editingAgentId}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <AgentStudio
+              onPageChange={handleBackToManager}
+              userName={userInfo?.name}
+              editingAgentId={editingAgentId}
+            />
+          </Suspense>
         );
       } else if (agentMode === 'runner' && runningAgentId) {
         return (
-          <AgentRunnerSDK
-            agentId={runningAgentId}
-            onClose={handleBackToManager}
-          />
+          <Suspense fallback={<PageLoader />}>
+            <AgentRunnerSDK
+              agentId={runningAgentId}
+              onClose={handleBackToManager}
+            />
+          </Suspense>
         );
       }
     }
-    
 
-    
+
+
     if (activePage === 'image-gen') {
-      return <ImageGen onPageChange={setActivePage} />;
+      return (
+        <Suspense fallback={<PageLoader />}>
+          <ImageGen onPageChange={setActivePage} />
+        </Suspense>
+      );
     }
 
     if (activePage === 'gallery') {
-      return <Gallery onPageChange={setActivePage} />;
+      return (
+        <Suspense fallback={<PageLoader />}>
+          <Gallery onPageChange={setActivePage} />
+        </Suspense>
+      );
     }
 
     if (activePage === 'n8n') {
-      return <N8N onPageChange={setActivePage} />;
+      return (
+        <Suspense fallback={<PageLoader />}>
+          <N8N onPageChange={setActivePage} />
+        </Suspense>
+      );
     }
-    
+
     if (activePage === 'servers') {
-      return <Servers onPageChange={setActivePage} />;
+      return (
+        <Suspense fallback={<PageLoader />}>
+          <Servers onPageChange={setActivePage} />
+        </Suspense>
+      );
     }
 
     return (
       <div className="flex h-screen">
         <Sidebar activePage={activePage} onPageChange={setActivePage} alphaFeaturesEnabled={alphaFeaturesEnabled} />
-        
+
         <div className="flex-1 flex flex-col">
           <Topbar userName={userInfo?.name} onPageChange={setActivePage} />
-          
+
           <main className="">
-            {(() => {
-              switch (activePage) {
-                case 'tasks':
-                  return <Tasks onPageChange={setActivePage} />;
-                case 'community':
-                  return <Community onPageChange={setActivePage} />;
-                case 'settings':
-                  return <Settings />;
-                case 'debug':
-                  return <Debug />;
-                case 'help':
-                  return <Help />;
-                case 'notebooks':
-                  return <Notebooks onPageChange={setActivePage} userName={userInfo?.name} />;
-                case 'lumaui':
-                  return <Lumaui />;
-                case 'lumaui-lite':
-                  return <LumaUILite />;
-                case 'dashboard':
-                default:
-                  return <Dashboard onPageChange={setActivePage} />;
-              }
-            })()}
+            <Suspense fallback={<PageLoader />}>
+              {(() => {
+                switch (activePage) {
+                  case 'tasks':
+                    return <Tasks onPageChange={setActivePage} />;
+                  case 'community':
+                    return <Community onPageChange={setActivePage} />;
+                  case 'settings':
+                    return <Settings />;
+                  case 'debug':
+                    return <Debug />;
+                  case 'help':
+                    return <Help />;
+                  case 'notebooks':
+                    return <Notebooks onPageChange={setActivePage} userName={userInfo?.name} />;
+                  case 'lumaui':
+                    return <Lumaui />;
+                  case 'lumaui-lite':
+                    return <LumaUILite />;
+                  case 'dashboard':
+                  default:
+                    return <Dashboard onPageChange={setActivePage} />;
+                }
+              })()}
+            </Suspense>
           </main>
         </div>
       </div>
@@ -263,7 +303,9 @@ function App() {
       <ArtifactPaneProvider>
         <div className="min-h-screen bg-gradient-to-br from-white to-sakura-100 dark:from-gray-900 dark:to-sakura-100">
           {showOnboarding ? (
-            <Onboarding onComplete={handleOnboardingComplete} />
+            <Suspense fallback={<PageLoader />}>
+              <Onboarding onComplete={handleOnboardingComplete} />
+            </Suspense>
           ) : (
             <>
               {/* Smart rendering: Keep Clara mounted when processing, unmount when idle */}
@@ -272,10 +314,12 @@ function App() {
                   className={activePage === 'clara' ? 'block' : 'hidden'}
                   data-clara-container
                 >
-                  <ClaraAssistant
-                    onPageChange={setActivePage}
-                    onProcessingChange={setIsClaraProcessing}
-                  />
+                  <Suspense fallback={<PageLoader />}>
+                    <ClaraAssistant
+                      onPageChange={setActivePage}
+                      onProcessingChange={setIsClaraProcessing}
+                    />
+                  </Suspense>
                 </div>
               )}
 

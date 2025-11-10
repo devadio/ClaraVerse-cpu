@@ -145,16 +145,16 @@ const ThreeJSGraph: React.FC<ThreeJSGraphProps> = ({
     camera.position.set(150, 150, 250);
     cameraRef.current = camera;
 
-    // Renderer setup
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: true,
+    // Renderer setup - optimized for low-end hardware
+    const renderer = new THREE.WebGLRenderer({
+      antialias: false, // Disabled for better performance on low-end hardware
       alpha: true,
-      powerPreference: "high-performance"
+      powerPreference: "low-power" // Use low-power mode for i3 processors
     });
     renderer.setSize(mountRef.current.clientWidth, mountRef.current.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Lower pixel ratio for better performance
+    renderer.shadowMap.enabled = false; // Shadows disabled for performance
+    // renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Commented out - not needed
     mountRef.current.appendChild(renderer.domElement);
     rendererRef.current = renderer;
 
@@ -310,8 +310,8 @@ const ThreeJSGraph: React.FC<ThreeJSGraphProps> = ({
         (Math.random() - 0.5) * 200
       ];
 
-      // Create enhanced sphere with matte materials
-      const geometry = new THREE.SphereGeometry(config.size, 32, 32);
+      // Create sphere with low-poly geometry for better performance
+      const geometry = new THREE.SphereGeometry(config.size, 16, 16); // Reduced from 32,32 to 16,16
       const material = new THREE.MeshLambertMaterial({
         color: config.color,
         transparent: false,
@@ -321,8 +321,8 @@ const ThreeJSGraph: React.FC<ThreeJSGraphProps> = ({
 
       const sphere = new THREE.Mesh(geometry, material);
       sphere.position.set(position[0], position[1], position[2]);
-      sphere.castShadow = true;
-      sphere.receiveShadow = true;
+      sphere.castShadow = false; // Disabled for performance
+      sphere.receiveShadow = false; // Disabled for performance
       sphere.userData = {
         ...nodeData,
         entityType: entityType,
@@ -332,8 +332,8 @@ const ThreeJSGraph: React.FC<ThreeJSGraphProps> = ({
         configSize: config.size
       };
 
-      // Create enhanced outline with glow effect
-      const outlineGeometry = new THREE.SphereGeometry(config.size * 1.15, 32, 32);
+      // Create outline with low-poly geometry for better performance
+      const outlineGeometry = new THREE.SphereGeometry(config.size * 1.15, 16, 16); // Reduced from 32,32 to 16,16
       const outlineMaterial = new THREE.MeshBasicMaterial({
         color: config.color,
         transparent: true,
@@ -359,9 +359,9 @@ const ThreeJSGraph: React.FC<ThreeJSGraphProps> = ({
           toNode.sphere.position.clone()
         ];
 
-        // Create moderately thick lines using TubeGeometry - reduced width by 50%
+        // Create thin lines using TubeGeometry with minimal segments for performance
         const curve = new THREE.CatmullRomCurve3(points);
-        const tubeGeometry = new THREE.TubeGeometry(curve, 64, 0.4, 8, false); // Reduced from 0.8 to 0.4
+        const tubeGeometry = new THREE.TubeGeometry(curve, 16, 0.4, 6, false); // Reduced segments from 64 to 16, radial from 8 to 6
         const tubeMaterial = new THREE.MeshPhongMaterial({
           color: 0xffffff, // White color for better visibility on dark background
           transparent: true,
@@ -567,30 +567,43 @@ const ThreeJSGraph: React.FC<ThreeJSGraphProps> = ({
     };
   }, [selectNode, deselectAllNodes]);
 
-  // Animation loop
+  // Optimized animation loop - only render when needed
   const animate = useCallback(() => {
     if (!rendererRef.current || !sceneRef.current || !cameraRef.current || !controlsRef.current) {
       return;
     }
 
-    controlsRef.current.update();
+    // Check if controls are being interacted with
+    const controlsNeedUpdate = controlsRef.current.update();
 
-    // Gentle rotation when no node is selected
+    // Only rotate and animate when not selected (reduced frequency for low-end hardware)
+    let needsRender = controlsNeedUpdate;
+
     if (!selectedNodeRef.current) {
-      sceneRef.current.rotation.y += 0.0005;
+      // Reduce rotation speed and only rotate every few frames for better performance
+      const frameCount = Date.now() % 30;
+      if (frameCount === 0) {
+        sceneRef.current.rotation.y += 0.0005;
+        needsRender = true;
+      }
     }
 
-    // Animate node glow effects
-    nodesRef.current.forEach(nodeObj => {
-      const material = nodeObj.sphere.material as THREE.MeshLambertMaterial;
+    // Simplified glow animation - only for selected nodes, not all nodes
+    if (selectedNodeRef.current) {
+      const material = selectedNodeRef.current.material as THREE.MeshLambertMaterial;
       if (material.emissive.r > 0 || material.emissive.g > 0 || material.emissive.b > 0) {
         const time = Date.now() * 0.003;
-        const baseColor = new THREE.Color(nodeObj.sphere.userData.originalColor);
-        material.emissive.copy(baseColor).multiplyScalar(0.2 * (0.8 + 0.2 * Math.sin(time))); // Reduced for matte
+        const baseColor = new THREE.Color(selectedNodeRef.current.userData.originalColor);
+        material.emissive.copy(baseColor).multiplyScalar(0.2 * (0.8 + 0.2 * Math.sin(time)));
+        needsRender = true;
       }
-    });
+    }
 
-    rendererRef.current.render(sceneRef.current, cameraRef.current);
+    // Only render if something changed
+    if (needsRender) {
+      rendererRef.current.render(sceneRef.current, cameraRef.current);
+    }
+
     animationRef.current = requestAnimationFrame(animate);
   }, []);
 

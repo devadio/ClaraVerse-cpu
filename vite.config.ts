@@ -108,11 +108,52 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
+          // Core dependencies
           vendor: ['react', 'react-dom'],
-          pdfjs: ['pdfjs-dist']
+
+          // Heavy editor - only load when needed
+          monaco: ['@monaco-editor/react', 'monaco-editor'],
+
+          // PDF processing - lazy load
+          pdfjs: ['pdfjs-dist'],
+
+          // 3D graphics - lazy load
+          three: ['three'],
+
+          // Diagram rendering - lazy load
+          mermaid: ['mermaid'],
+
+          // Chart libraries - lazy load
+          charts: ['chart.js', 'react-chartjs-2'],
+
+          // LangChain and AI - only load when needed
+          langchain: ['langchain', '@langchain/core'],
+
+          // ReactFlow for agent builder
+          reactflow: ['reactflow'],
+
+          // Animation libraries
+          animations: ['gsap', 'framer-motion'],
+
+          // Markdown and rich text
+          markdown: ['react-markdown', 'remark-gfm', 'rehype-raw', 'rehype-sanitize'],
+
+          // UI component libraries
+          ui: ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-select', '@radix-ui/react-tabs'],
+
+          // Icons
+          icons: ['lucide-react'],
+
+          // Code splitting by route/page
+          'route-agents': [/AgentBuilder/, /AgentStudio/, /AgentManager/, /AgentRunner/],
+          'route-notebooks': [/Notebooks/, /NotebookCanvas/],
+          'route-imagegen': [/ImageGen/, /Gallery/],
+          'route-clara': [/ClaraAssistant/, /clara_assistant/],
         },
       },
     },
+    // Optimize chunk size
+    chunkSizeWarningLimit: 1000,
   },
   preview: {
     headers: {
