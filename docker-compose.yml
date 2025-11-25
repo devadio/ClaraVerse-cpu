@@ -37,7 +37,7 @@ services:
       # 3. ComfyUI: Image Generation & AI Workflows
       # ---------------------------------------------------------------------------
   comfyui:
-    image: yanwk/comfyui-boot:latest
+    image: yanwk/comfyui-boot:cpu
     container_name: clara_comfyui
     restart: unless-stopped
     ports:
