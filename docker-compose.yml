@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # ---------------------------------------------------------------------------
   # 1. Frontend: The React Web Interface
@@ -36,10 +34,10 @@ services:
       # Add other env vars from .env.example if needed
 
       # ---------------------------------------------------------------------------
-      # 3. ComfyUI: Image Generation & AI Workflows (Clara Core)
+      # 3. ComfyUI: Image Generation & AI Workflows
       # ---------------------------------------------------------------------------
   comfyui:
-    image: clara17verse/clara-comfyui:latest
+    image: yanwk/comfyui-boot:latest
     container_name: clara_comfyui
     restart: unless-stopped
     ports:
@@ -53,7 +51,7 @@ services:
       - COMFYUI_HOST=0.0.0.0
       - COMFYUI_PORT=8188
       - CUDA_VISIBLE_DEVICES="" # Force CPU
-      - ARGS="--cpu" # Often needed for ComfyUI to force CPU mode
+      - ARGS="--cpu" # Force CPU mode
 
   # ---------------------------------------------------------------------------
   # 4. Ollama: Local LLM Inference
@@ -66,7 +64,6 @@ services:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
-    # No deploy section needed for CPU only
 
 volumes:
   comfyui_models:
